@@ -4,3 +4,12 @@ To integrate Het's real Neo4j export into our PyTorch Geometric model, we will m
 The node properties from Neo4j (such as criticality, risk levels, and operational metrics for Ports, Suppliers, Manufacturers, and Retailers) will be normalized and concatenated into the `x` feature matrix (shape `[num_nodes, num_features]`). 
 The relationships in Neo4j (such as 'SUPPLIES_TO' or 'SHIPS_VIA') will be extracted to form the `edge_index` tensor (shape `[2, num_edges]`), capturing the directional flow of the supply chain. 
 Categorical node types can also be one-hot encoded and appended to the `x` features so the GCN layer can differentiate between a Port and a Retailer.
+
+## Typical Entities/Locations in Disruption Events (GDELT)
+For disruption-related news events such as port strikes, factory fires, shipping delays, and trade tariffs, typical entities that appear include:
+* **ORGANIZATION**: Labor unions, port authorities, shipping companies, manufacturers, governments, regulatory bodies.
+* **GPE (Geo-Political Entity)**: Countries (e.g., US, Pakistan), cities, states/provinces involved in the disruption.
+* **LOC (Location)**: Major waterways, oceans, specific ports.
+* **PERSON**: Key union leaders, government officials, or company spokespersons.
+* **FAC (Facility)**: Specific factories, port facilities, or infrastructure.
+These entities guide the NER extraction rules for tracking disruptions in the supply chain graph.
