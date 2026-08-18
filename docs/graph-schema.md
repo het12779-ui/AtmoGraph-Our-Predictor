@@ -13,3 +13,7 @@ For disruption-related news events such as port strikes, factory fires, shipping
 * **PERSON**: Key union leaders, government officials, or company spokespersons.
 * **FAC (Facility)**: Specific factories, port facilities, or infrastructure.
 These entities guide the NER extraction rules for tracking disruptions in the supply chain graph.
+
+## Theme Reliability (Day 2 Findings)
+* **Reliable Themes**: `STRIKE`, `PORT`, `NATURAL_DISASTER`, `TRADE_DISPUTE` consistently yield highly relevant supply-chain disruption articles.
+* **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context, pulling residential fires instead of just factories. `TARIFF` can be very noisy with political commentary.
