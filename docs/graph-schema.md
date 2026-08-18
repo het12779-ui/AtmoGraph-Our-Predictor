@@ -17,3 +17,8 @@ These entities guide the NER extraction rules for tracking disruptions in the su
 ## Theme Reliability (Day 2 Findings)
 * **Reliable Themes**: `STRIKE`, `PORT`, `NATURAL_DISASTER`, `TRADE_DISPUTE` consistently yield highly relevant supply-chain disruption articles.
 * **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context, pulling residential fires instead of just factories. `TARIFF` can be very noisy with political commentary.
+
+## NER Extraction Quality (Day 3 Findings)
+* **Organizations (ORG)**: spaCy often extracts noisy or partial phrases from titles (e.g., "Retail Supply Chain Leaders Say Disruption" instead of just the organization name).
+* **Locations (GPE)**: Extraction is sparse and can miss implicit or abbreviated locations (e.g., "TN" for Tamil Nadu).
+* **Event Types**: A simple keyword-based approach defaults to `UNKNOWN` too frequently because news titles use varied synonyms and complex syntax that strict string matching misses.
