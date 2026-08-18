@@ -22,3 +22,8 @@ These entities guide the NER extraction rules for tracking disruptions in the su
 * **Organizations (ORG)**: spaCy often extracts noisy or partial phrases from titles (e.g., "Retail Supply Chain Leaders Say Disruption" instead of just the organization name).
 * **Locations (GPE)**: Extraction is sparse and can miss implicit or abbreviated locations (e.g., "TN" for Tamil Nadu).
 * **Event Types**: A simple keyword-based approach defaults to `UNKNOWN` too frequently because news titles use varied synonyms and complex syntax that strict string matching misses.
+
+## Baseline Model Checkpoint (Week 1)
+* **Dummy Label**: Currently predicting a degree-based dummy target.
+* **Held-out Accuracy**: 100.00% (on dummy label with mock structure, verifies pipeline).
+* **Next Steps for Week 2**: Transition from dummy targets to real risk labels based on aggregated graph features.
