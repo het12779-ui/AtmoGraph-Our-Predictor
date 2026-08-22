@@ -1,29 +1,60 @@
-# Graph Schema Mapping
+# AtmoGraph Graph Schema Documentation
 
-To integrate Het's real Neo4j export into our PyTorch Geometric model, we will map the Neo4j schema into the `x` and `edge_index` tensors. 
-The node properties from Neo4j (such as criticality, risk levels, and operational metrics for Ports, Suppliers, Manufacturers, and Retailers) will be normalized and concatenated into the `x` feature matrix (shape `[num_nodes, num_features]`). 
-The relationships in Neo4j (such as 'SUPPLIES_TO' or 'SHIPS_VIA') will be extracted to form the `edge_index` tensor (shape `[2, num_edges]`), capturing the directional flow of the supply chain. 
-Categorical node types can also be one-hot encoded and appended to the `x` features so the GCN layer can differentiate between a Port and a Retailer.
+## 1. Overview & Core Graph Schema
+This document defines the Neo4j graph schema for AtmoGraph, including the primary node entities and edge relationship types used to model supply chain operations and disruption impacts.
 
-## Typical Entities/Locations in Disruption Events (GDELT)
+### Node Types
+* **Supplier**: Entities supplying raw materials or components (e.g., Acme Components).
+* **Manufacturer**: Facilities or organizations manufacturing end products or components (e.g., Global Electronics Co.).
+* **Port**: Logistics nodes, shipping ports, or distribution hubs handling transit (e.g., Port of Rotterdam).
+* **Retailer**: End destination entities or retail points of sale (e.g., US Retail Corp).
+* **Product**: Specific SKUs or product categories moving through the supply chain.
+
+### Relationship / Edge Types
+* **SUPPLIES**: Directed relationship from Supplier/Manufacturer/Port to downstream entity (e.g., `(Port)-[:SUPPLIES]->(Manufacturer)` or `(Manufacturer)-[:SUPPLIES]->(Retailer)`).
+* **SHIPS_VIA**: Directed relationship specifying logistics route via transit nodes (e.g., `(Supplier)-[:SHIPS_VIA]->(Port)`).
+* **DEPENDS_ON**: Directed relationship indicating structural or operational dependency (e.g., `(Manufacturer)-[:DEPENDS_ON]->(Product)` or `(Retailer)-[:DEPENDS_ON]->(Manufacturer)`).
+
+---
+
+## 2. SupplyGraph Dataset Schema & Entity Documentation
+
+### Node Categories
+* **Product (SKU) Nodes**: 41 unique product nodes (`SOS008L02P`, `SOS005L04P`, `AT5X5K`, etc.) defined in `Nodes.csv` and indexed in `NodesIndex.csv` (indices `0` to `40`).
+* **Product Hierarchy**: Mapped in `Node Types (Product Group and Subgroup).csv` containing high-level `Group` codes (e.g. `S`) and detailed `Sub-Group` codes (e.g. `SOS`).
+* **Facility Network (Plants & Storage Locations)**: Defined in `Nodes Type (Plant & Storage).csv`, linking products to specific operational Plants (e.g., `2120`) and Storage Locations (e.g., `2030.0`).
+
+### Natural Edge Types & Relationships
+* **PLANT_RELATION (`Edges (Plant).csv`)**: Captures supply movement / dependency between `node1` and `node2` filtered by operational Plant ID.
+* **STORAGE_RELATION (`Edges (Storage Location).csv`)**: Connects product nodes co-located or transferred across specific Storage Location IDs.
+* **PRODUCT_GROUP_RELATION (`Edges (Product Group).csv`)**: Categorical edge linking product nodes belonging to the same product GroupCode.
+* **PRODUCT_SUBGROUP_RELATION (`Edges (Product Sub-Group).csv`)**: Hierarchy edge connecting product nodes within the same SubGroupCode.
+
+### Time-Based Columns & Temporal Features
+* **Time Column**: `Date` (Daily timestamps formatted as `YYYY-MM-DD HH:MM:SS`, spanning 221 consecutive days from `2023-01-01`).
+* **Dynamic Node Metric Features (221 Timesteps)**:
+  1. **Production (`Production.csv`)**: Daily manufactured quantity/volume per SKU node.
+  2. **Factory Issue (`Factory Issue.csv`)**: Daily volume dispatched from factory storage per SKU node.
+  3. **Sales Order (`Sales Order.csv`)**: Daily customer demand & order quantities per SKU node.
+  4. **Delivery to Distributor (`Delivery to Distributor.csv` / `Delivery To distributor.csv`)**: Daily fulfilled order volumes delivered to distributors (tracked in both Units and Weight).
+
+---
+
+## 3. PyTorch Geometric Mapping & Disruption Integration
+
+### Graph Schema Mapping to PyG
+To integrate the Neo4j export into our PyTorch Geometric model, we map the Neo4j schema into the `x` and `edge_index` tensors:
+* **Node Features (`x`)**: Node properties from Neo4j (such as criticality, risk levels, operational metrics, or one-hot encoded categorical node types) are normalized and concatenated into the `x` feature matrix (shape `[num_nodes, num_features]`).
+* **Edge Index (`edge_index`)**: Relationships in Neo4j (e.g., `SUPPLIES`, `SHIPS_VIA`, `DEPENDS_ON`) are extracted to form the `edge_index` tensor (shape `[2, num_edges]`), capturing directional flow.
+
+### Typical Entities & Disruption Events (GDELT)
 For disruption-related news events such as port strikes, factory fires, shipping delays, and trade tariffs, typical entities that appear include:
 * **ORGANIZATION**: Labor unions, port authorities, shipping companies, manufacturers, governments, regulatory bodies.
 * **GPE (Geo-Political Entity)**: Countries (e.g., US, Pakistan), cities, states/provinces involved in the disruption.
 * **LOC (Location)**: Major waterways, oceans, specific ports.
 * **PERSON**: Key union leaders, government officials, or company spokespersons.
 * **FAC (Facility)**: Specific factories, port facilities, or infrastructure.
-These entities guide the NER extraction rules for tracking disruptions in the supply chain graph.
 
-## Theme Reliability (Day 2 Findings)
+### Theme Reliability & Findings
 * **Reliable Themes**: `STRIKE`, `PORT`, `NATURAL_DISASTER`, `TRADE_DISPUTE` consistently yield highly relevant supply-chain disruption articles.
-* **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context, pulling residential fires instead of just factories. `TARIFF` can be very noisy with political commentary.
-
-## NER Extraction Quality (Day 3 Findings)
-* **Organizations (ORG)**: spaCy often extracts noisy or partial phrases from titles (e.g., "Retail Supply Chain Leaders Say Disruption" instead of just the organization name).
-* **Locations (GPE)**: Extraction is sparse and can miss implicit or abbreviated locations (e.g., "TN" for Tamil Nadu).
-* **Event Types**: A simple keyword-based approach defaults to `UNKNOWN` too frequently because news titles use varied synonyms and complex syntax that strict string matching misses.
-
-## Baseline Model Checkpoint (Week 1)
-* **Dummy Label**: Currently predicting a degree-based dummy target.
-* **Held-out Accuracy**: 100.00% (on dummy label with mock structure, verifies pipeline).
-* **Next Steps for Week 2**: Transition from dummy targets to real risk labels based on aggregated graph features.
+* **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context. `TARIFF` can be very noisy with political commentary.
