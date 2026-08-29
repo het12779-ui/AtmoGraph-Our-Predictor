@@ -138,3 +138,27 @@ def update_risk(node_id: str, payload: RiskUpdate):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
+def get_neighbors(tx, node_id, hops):
+    query = (
+        f"MATCH (n {{id: $id}})-[*1..{hops}]-(neighbor) "
+        f"RETURN DISTINCT neighbor.id AS id, neighbor.name AS name, "
+        f"coalesce(neighbor.risk, 'low') AS risk"
+    )
+    result = tx.run(query, id=node_id)
+    return [dict(r) for r in result]
+
+
+@app.get("/node/{node_id}/neighbors")
+def node_neighbors(node_id: str, hops: int = 2):
+    with driver.session() as session:
+        neighbors = session.execute_read(
+            get_neighbors,
+            node_id,
+            hops
+        )
+
+    return {
+        "node_id": node_id,
+        "hops": hops,
+        "neighbors": neighbors
+    }
