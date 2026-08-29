@@ -7,3 +7,4 @@ dist/
 .env
 neo4j-data/
 data/raw/
+**/data/raw/

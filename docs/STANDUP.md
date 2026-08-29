@@ -1,7 +1,6 @@
 # Daily Standup Log
-
 ## Week 1 - Day 1
-- M1:
-- M2:
-- M3:
-- M4:
+- Het: Set up graph-backend environment, created explore_supplygraph.py script, downloaded SupplyGraph raw dataset, and documented graph schema.
+- Jems:
+- Devam:
+- Shreyas:
