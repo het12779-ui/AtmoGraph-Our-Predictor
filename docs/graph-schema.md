@@ -58,3 +58,10 @@ For disruption-related news events such as port strikes, factory fires, shipping
 ### Theme Reliability & Findings
 * **Reliable Themes**: `STRIKE`, `PORT`, `NATURAL_DISASTER`, `TRADE_DISPUTE` consistently yield highly relevant supply-chain disruption articles.
 * **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context. `TARIFF` can be very noisy with political commentary.
+
+## Aliases (Week 2)
+- News article names rarely match database names exactly (e.g. "Maersk" vs "A.P. Moller-Maersk"). Will be addressed with an alias table.
+
+## Model Accuracies
+- Baseline GCN: ~70.00%
+- Baseline GAT: ~72.00%

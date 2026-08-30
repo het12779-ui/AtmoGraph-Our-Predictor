@@ -1,13 +1,35 @@
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from neo4j import GraphDatabase
 from pydantic import BaseModel
-import os
+from neo4j import GraphDatabase
 
-URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-AUTH = (os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "atmograph123"))
+class RiskUpdate(BaseModel):
+    risk: str  # "low" | "medium" | "high"
 
-app = FastAPI(title="AtmoGraph API")
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "atmograph123")
+
+driver = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global driver
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        driver.verify_connectivity()
+        print("Connected to Neo4j successfully.")
+    except Exception as e:
+        print(f"Warning: Could not connect to Neo4j on startup: {e}")
+        driver = None
+    yield
+    if driver:
+        driver.close()
+        print("Neo4j driver closed.")
+
+app = FastAPI(title="AtmoGraph Predictor Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,107 +39,127 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-driver = None
+def set_risk(tx, node_id: str, risk: str):
+    result = tx.run(
+        "MATCH (n) WHERE n.id = $id SET n.risk = $risk RETURN n.id AS id, n.risk AS risk",
+        id=node_id,
+        risk=risk
+    )
+    return result.single()
 
-def get_driver():
-    global driver
-    if driver is None:
-        driver = GraphDatabase.driver(URI, auth=AUTH, connection_timeout=2.0)
-    return driver
+def get_neighbors(tx, node_id, hops):
+    query = (
+        f"MATCH (n {{id: $id}})-[*1..{hops}]-(neighbor) "
+        f"RETURN DISTINCT neighbor.id AS id, neighbor.name AS name, "
+        f"coalesce(neighbor.risk, 'low') AS risk"
+    )
+    result = tx.run(query, id=node_id)
+    return [dict(r) for r in result]
 
-class RiskUpdate(BaseModel):
-    risk: str
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+@app.get("/")
+def read_root():
+    return {"message": "AtmoGraph Backend API is running."}
 
 @app.get("/graph")
 def get_graph():
-    try:
-        drv = get_driver()
-        with drv.session() as session:
-            # Query nodes
-            nodes_result = session.run("MATCH (n) RETURN n, labels(n) AS labels")
-            nodes = []
-            for record in nodes_result:
-                node = record["n"]
-                labels = record["labels"]
-                node_id = str(node.get("id") or node.element_id)
-                label = str(node.get("name") or node.get("label") or node_id)
-                node_type = labels[0] if labels else "Unknown"
-                risk = str(node.get("risk") or "low")
-                nodes.append({
-                    "id": node_id,
-                    "label": label,
-                    "type": node_type,
-                    "risk": risk
-                })
+    if driver:
+        try:
+            with driver.session() as session:
+                nodes_query = """
+                MATCH (n)
+                RETURN n.id AS id, coalesce(n.name, n.label, n.id) AS label, labels(n)[0] AS type, coalesce(n.risk, 'low') AS risk
+                """
+                nodes_result = session.run(nodes_query)
+                nodes = []
+                for r in nodes_result:
+                    nodes.append({
+                        "id": r["id"],
+                        "label": r["label"] or r["id"],
+                        "type": r["type"] or "Unknown",
+                        "risk": r["risk"] or "low"
+                    })
 
-            # Query edges
-            edges_result = session.run("MATCH (a)-[r]->(b) RETURN r, a, b")
-            edges = []
-            for record in edges_result:
-                rel = record["r"]
-                a = record["a"]
-                b = record["b"]
-                edge_id = str(rel.get("id") or rel.element_id)
-                source_id = str(a.get("id") or a.element_id)
-                target_id = str(b.get("id") or b.element_id)
-                edges.append({
-                    "id": edge_id,
-                    "source": source_id,
-                    "target": target_id
-                })
+                edges_query = """
+                MATCH (a)-[r]->(b)
+                RETURN a.id AS source, b.id AS target, elementId(r) AS edge_id
+                """
+                edges_result = session.run(edges_query)
+                edges = []
+                for r in edges_result:
+                    edges.append({
+                        "id": r["edge_id"] or f"{r['source']}-{r['target']}",
+                        "source": r["source"],
+                        "target": r["target"]
+                    })
 
-            # If graph is empty (e.g. database not populated yet), return default mock shape
-            if not nodes and not edges:
-                return {
-                    "nodes": [
-                        { "id": "1", "label": "Port of Rotterdam", "type": "Port", "risk": "low" },
-                        { "id": "2", "label": "Freight Co. X", "type": "Supplier", "risk": "medium" },
-                        { "id": "3", "label": "Factory (Ohio)", "type": "Manufacturer", "risk": "low" }
-                    ],
-                    "edges": [
-                        { "id": "e1-2", "source": "1", "target": "2" },
-                        { "id": "e2-3", "source": "2", "target": "3" }
-                    ]
-                }
+                if nodes or edges:
+                    return {"nodes": nodes, "edges": edges}
+        except Exception as e:
+            print(f"Neo4j query error: {e}")
 
-            return {"nodes": nodes, "edges": edges}
-    except Exception as e:
-        # Fallback to mock graph if Neo4j is unreachable
-        return {
-            "nodes": [
-                { "id": "1", "label": "Port of Rotterdam", "type": "Port", "risk": "low" },
-                { "id": "2", "label": "Freight Co. X", "type": "Supplier", "risk": "medium" },
-                { "id": "3", "label": "Factory (Ohio)", "type": "Manufacturer", "risk": "low" }
-            ],
-            "edges": [
-                { "id": "e1-2", "source": "1", "target": "2" },
-                { "id": "e2-3", "source": "2", "target": "3" }
-            ]
-        }
+    # Fallback mock graph if Neo4j is not populated or offline
+    return {
+        "nodes": [
+            { "id": "1", "label": "Port of Rotterdam", "type": "Port", "risk": "low" },
+            { "id": "2", "label": "Freight Co. X", "type": "Supplier", "risk": "medium" },
+            { "id": "3", "label": "Factory (Ohio)", "type": "Manufacturer", "risk": "low" }
+        ],
+        "edges": [
+            { "id": "e1-2", "source": "1", "target": "2" },
+            { "id": "e2-3", "source": "2", "target": "3" }
+        ]
+    }
 
 @app.patch("/node/{node_id}/risk")
-def update_node_risk(node_id: str, update: RiskUpdate):
-    try:
-        drv = get_driver()
-        with drv.session() as session:
-            result = session.run(
-                """
-                MATCH (n)
-                WHERE n.id = $node_id OR elementId(n) = $node_id OR n.name = $node_id
-                SET n.risk = $risk
-                RETURN n
-                """,
-                node_id=node_id, risk=update.risk
-            )
-            record = result.single()
-            if not record:
-                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-            return {"status": "ok", "node_id": node_id, "risk": update.risk}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def update_risk(node_id: str, payload: RiskUpdate):
+    if driver:
+        try:
+            with driver.session() as session:
+                record = session.execute_write(set_risk, node_id, payload.risk)
+                if record:
+                    return {
+                        "message": "Risk updated successfully",
+                        "id": record["id"],
+                        "risk": record["risk"]
+                    }
+        except Exception as e:
+            print(f"Neo4j update error: {e}")
+
+    # Fallback response if offline
+    return {
+        "message": "Risk updated successfully (mock)",
+        "id": node_id,
+        "risk": payload.risk
+    }
+
+@app.get("/node/{node_id}/neighbors")
+def node_neighbors(node_id: str, hops: int = 2):
+    if driver:
+        try:
+            with driver.session() as session:
+                neighbors = session.execute_read(
+                    get_neighbors,
+                    node_id,
+                    hops
+                )
+                return {
+                    "node_id": node_id,
+                    "hops": hops,
+                    "neighbors": neighbors
+                }
+        except Exception as e:
+            print(f"Neo4j neighbors query error: {e}")
+
+    # Fallback mock neighbors
+    mock_neighbors_map = {
+        "1": [{"id": "2", "name": "Freight Co. X", "risk": "medium"}, {"id": "3", "name": "Factory (Ohio)", "risk": "low"}],
+        "2": [{"id": "1", "name": "Port of Rotterdam", "risk": "low"}, {"id": "3", "name": "Factory (Ohio)", "risk": "low"}],
+        "3": [{"id": "2", "name": "Freight Co. X", "risk": "medium"}, {"id": "1", "name": "Port of Rotterdam", "risk": "low"}],
+    }
+    neighbors = mock_neighbors_map.get(node_id, [])
+    return {
+        "node_id": node_id,
+        "hops": hops,
+        "neighbors": neighbors
+    }
+

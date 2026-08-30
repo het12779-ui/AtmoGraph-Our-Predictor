@@ -1,7 +1,8 @@
 import requests
 from filter_disruption_events import pull_with_themes, looks_relevant
 from extract_entities import extract
-from match_entities_to_graph import fetch_all_node_names, match_entity
+from match_entities_to_graph import fetch_all_node_names
+from match_with_aliases import match_entity_with_alias as match_entity
 from neo4j import GraphDatabase
 
 URI = "bolt://localhost:7687"
