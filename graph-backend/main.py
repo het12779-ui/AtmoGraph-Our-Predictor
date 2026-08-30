@@ -163,3 +163,56 @@ def node_neighbors(node_id: str, hops: int = 2):
         "neighbors": neighbors
     }
 
+def get_impact_neighbors(tx, node_id, hops):
+    query = (
+        f"MATCH p = shortestPath((n {{id: $id}})-[*1..{hops}]-(neighbor)) "
+        f"WHERE neighbor.id <> $id "
+        f"WITH neighbor, length(p) AS hops_away "
+        f"RETURN DISTINCT neighbor.id AS id, neighbor.name AS name, "
+        f"coalesce(neighbor.risk, 'low') AS risk, hops_away, "
+        f"round(1.0 / hops_away, 2) AS impact_score"
+    )
+    result = tx.run(query, id=node_id)
+    return [dict(r) for r in result]
+
+@app.get("/node/{node_id}/impact")
+def node_impact(node_id: str, hops: int = 3):
+    if driver:
+        try:
+            with driver.session() as session:
+                neighbors = session.execute_read(
+                    get_impact_neighbors,
+                    node_id,
+                    hops
+                )
+                return {
+                    "node_id": node_id,
+                    "hops": hops,
+                    "neighbors": neighbors
+                }
+        except Exception as e:
+            print(f"Neo4j impact query error: {e}")
+
+    # Fallback mock impact neighbors
+    mock_impact_map = {
+        "1": [
+            {"id": "2", "name": "Freight Co. X", "risk": "medium", "hops_away": 1, "impact_score": 1.0},
+            {"id": "3", "name": "Factory (Ohio)", "risk": "low", "hops_away": 2, "impact_score": 0.5}
+        ],
+        "2": [
+            {"id": "1", "name": "Port of Rotterdam", "risk": "low", "hops_away": 1, "impact_score": 1.0},
+            {"id": "3", "name": "Factory (Ohio)", "risk": "low", "hops_away": 1, "impact_score": 1.0}
+        ],
+        "3": [
+            {"id": "2", "name": "Freight Co. X", "risk": "medium", "hops_away": 1, "impact_score": 1.0},
+            {"id": "1", "name": "Port of Rotterdam", "risk": "low", "hops_away": 2, "impact_score": 0.5}
+        ],
+    }
+    neighbors = mock_impact_map.get(node_id, [])
+    return {
+        "node_id": node_id,
+        "hops": hops,
+        "neighbors": neighbors
+    }
+
+

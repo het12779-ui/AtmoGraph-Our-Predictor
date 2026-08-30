@@ -42,3 +42,17 @@ export async function fetchNeighbors(nodeId: string, hops = 2): Promise<Neighbor
   if (!res.ok) throw new Error(`Neighbors fetch failed: ${res.status}`);
   return res.json();
 }
+
+export interface ImpactNeighbor {
+  id: string; name: string; risk: string; hops_away: number; impact_score: number;
+}
+
+export interface ImpactResponse {
+  node_id: string; hops: number; neighbors: ImpactNeighbor[];
+}
+
+export async function fetchImpact(nodeId: string, hops = 3): Promise<ImpactResponse> {
+  const res = await fetch(`http://localhost:8000/node/${nodeId}/impact?hops=${hops}`);
+  if (!res.ok) throw new Error(`Impact fetch failed: ${res.status}`);
+  return res.json();
+}

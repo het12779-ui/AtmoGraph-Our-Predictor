@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import ReactFlow, { Background, Controls, MiniMap, Node, Edge } from "reactflow";
 import "reactflow/dist/style.css";
-import { fetchGraph, updateNodeRisk, fetchNeighbors, GraphResponse } from "./api";
+import { fetchGraph, updateNodeRisk, fetchImpact, GraphResponse } from "./api";
 
 const RISK_COLORS: Record<string, string> = {
   low: "#10b981",
@@ -13,7 +13,7 @@ export default function App() {
   const [data, setData] = useState<GraphResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Node | null>(null);
-  const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
+  const [impactMap, setImpactMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     fetchGraph().then(setData).catch((e) => setError(e.message));
@@ -31,7 +31,9 @@ export default function App() {
       color: "#fff",
       borderRadius: 6,
       padding: "8px",
-      border: highlighted.has(n.id) ? "3px solid red" : undefined,
+      border: impactMap.has(n.id)
+        ? `3px solid rgba(239, 68, 68, ${impactMap.get(n.id)})`
+        : undefined,
     },
   }));
 
@@ -132,9 +134,9 @@ export default function App() {
               onClick={async () => {
                 const value = (document.getElementById("risk-select") as HTMLSelectElement).value;
                 await updateNodeRisk(selected.id, value);
-                const { neighbors } = await fetchNeighbors(selected.id, 2);
-                setHighlighted(new Set(neighbors.map((n) => n.id)));
-                alert(`Set ${selected.data.label} to ${value}. Highlighted ${neighbors.length} affected node(s).`);
+                const { neighbors } = await fetchImpact(selected.id, 3);
+                setImpactMap(new Map(neighbors.map((n) => [n.id, n.impact_score])));
+                alert(`Set ${selected.data.label} to ${value}. Ripple reaches ${neighbors.length} node(s).`);
               }}
               style={{
                 padding: "6px 12px",
