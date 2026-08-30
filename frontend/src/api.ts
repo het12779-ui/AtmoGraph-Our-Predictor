@@ -30,3 +30,15 @@ export async function updateNodeRisk(nodeId: string, risk: string): Promise<void
   });
   if (!res.ok) throw new Error(`Risk update failed: ${res.status}`);
 }
+
+export interface NeighborsResponse {
+  node_id: string;
+  hops: number;
+  neighbors: { id: string; name: string; risk: string }[];
+}
+
+export async function fetchNeighbors(nodeId: string, hops = 2): Promise<NeighborsResponse> {
+  const res = await fetch(`http://localhost:8000/node/${nodeId}/neighbors?hops=${hops}`);
+  if (!res.ok) throw new Error(`Neighbors fetch failed: ${res.status}`);
+  return res.json();
+}
