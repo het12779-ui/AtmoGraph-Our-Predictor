@@ -127,3 +127,6 @@ For disruption-related news events such as port strikes, factory fires, shipping
 ## Explainability (GAT)
 - Today's attention scores come from an untrained model (just proving the mechanism works).
 - Week 3 wires this up to a properly trained checkpoint on real risk labels, which is when the scores actually become meaningful.
+
+## Class Imbalance (Week 3 Concern)
+- When training on real risk values, most nodes are currently labeled as "low" risk. This severe class imbalance makes high accuracy trivial (as predicting "low" for everything yields a high score). This will need to be addressed properly in Week 3.
