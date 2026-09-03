@@ -117,6 +117,12 @@ For disruption-related news events such as port strikes, factory fires, shipping
 * **Reliable Themes**: `STRIKE`, `PORT`, `NATURAL_DISASTER`, `TRADE_DISPUTE` consistently yield highly relevant supply-chain disruption articles.
 * **Noisy Themes**: `SUPPLY_CHAIN` can sometimes pull generic business articles. `FIRE` is extremely noisy without context. `TARIFF` can be very noisy with political commentary.
 
+### Risk Refinement via GDELT Tone
+* **Tone Thresholds**: Risk severity is initially determined by keywords. We refine this using GDELT's article tone.
+* A tone <= -5.0 bumps the severity up a tier (e.g., from medium to high) as it indicates very negative, serious coverage.
+* A tone >= 3.0 reduces the severity down a tier (e.g., from medium to low) as it indicates positive/minor coverage.
+* *Note*: These thresholds (-5.0 / 3.0) theoretically separate "serious" from "minor" coverage, but may require further live tuning based on real-world distributions.
+
 ## Aliases (Week 2)
 - News article names rarely match database names exactly (e.g. "Maersk" vs "A.P. Moller-Maersk"). Will be addressed with an alias table.
 

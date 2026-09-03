@@ -6,6 +6,7 @@ from match_entities_to_graph import fetch_all_node_names
 from match_with_aliases import match_entity_with_alias as match_entity
 from neo4j import GraphDatabase
 import requests
+from tone_severity import refine_risk_with_tone
 
 URI = "bolt://localhost:7687"
 AUTH = ("neo4j", "atmograph123")
@@ -23,7 +24,9 @@ def run_once(seen, node_names, name_to_id):
     new_articles = [a for a in articles if a.get("url") not in seen and looks_relevant(a)]
     for article in new_articles:
         event = extract(article)
-        risk = RISK_BY_EVENT_TYPE.get(event["event_type"], "low")
+        base_risk = RISK_BY_EVENT_TYPE.get(event["event_type"], "low")
+        tone = float(article.get("tone", 0) or 0)
+        risk = refine_risk_with_tone(base_risk, tone)
         for entity in event["organizations"] + event["locations"]:
             m = match_entity(entity, node_names)
             if m and (node_id := name_to_id.get(m["matched_node"])):
