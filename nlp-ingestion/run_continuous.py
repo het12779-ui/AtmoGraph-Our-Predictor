@@ -30,7 +30,11 @@ def run_once(seen, node_names, name_to_id):
         for entity in event["organizations"] + event["locations"]:
             m = match_entity(entity, node_names)
             if m and (node_id := name_to_id.get(m["matched_node"])):
-                requests.patch(f"{API_BASE}/node/{node_id}/risk", json={"risk": risk})
+                source_label = f"{article.get('domain', 'unknown')}: {event['title'][:80]}"
+                requests.patch(
+                    f"{API_BASE}/node/{node_id}/risk",
+                    json={"risk": risk, "source": source_label},
+                )
                 print(f"[update] {m['matched_node']} -> {risk} (via {article.get('url')})")
         seen.add(article.get("url"))
     return seen
