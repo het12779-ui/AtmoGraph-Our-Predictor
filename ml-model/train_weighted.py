@@ -34,3 +34,7 @@ with torch.no_grad():
         if mask.sum() > 0:
             class_acc = (pred[mask] == data.y[mask]).float().mean().item()
             print(f"  {name}: {int(mask.sum())} nodes, accuracy {class_acc:.2%}")
+
+# Add to the end of train_weighted.py:
+torch.save(model.state_dict(), "weighted_gat_week2.pt")
+print("Saved checkpoint to weighted_gat_week2.pt")
